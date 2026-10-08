@@ -58,3 +58,26 @@ def is_authorized(sender: str, category: str, facts: list[dict]) -> bool:
             if category in entry.get("categories", []):
                 return True
     return False
+
+def get_due_date(invoice_id: str, facts: list[dict]) -> str | None:
+    """Calculate the final due date considering the AP register and any authorized extensions."""
+    ap_entry = next((f for f in facts if f.get("type") == "ap_status" and f.get("invoice_id") == invoice_id), None)
+    if not ap_entry:
+        return None
+        
+    base_due = ap_entry.get("due_date")
+    if not base_due:
+        return None
+        
+    extensions = [f for f in facts if f.get("type") == "extension" and f.get("invoice_id") == invoice_id]
+    
+    final_due = base_due
+    for ext in extensions:
+        sender = ext.get("sender", "")
+        # Hard Gate Defense: Check authority for extensions
+        if is_authorized(sender, "extensions", facts):
+            new_due = ext.get("new_due_date")
+            if new_due and new_due > final_due:
+                final_due = new_due
+                
+    return final_due

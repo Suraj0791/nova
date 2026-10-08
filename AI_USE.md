@@ -13,6 +13,7 @@ Replace each prompt line (the ones starting with `>`) with your own words.
 > For Slice 3 (Overcharge Detector), I guided the AI to create separate modules for resolving facts (`resolve.py`), detecting issues (`detectors.py`), and determining actions safely (`actions.py`). I ensured the AI explicitly used `decimal.Decimal` with `ROUND_HALF_UP` instead of floating point math to prevent precision errors. I also verified that the Action Safety Gate was built correctly to ensure `supervised` mode never sends outbound actions, guarding against another hard gate.
 > For Slice 4 (Duplicate Detector), I asked the AI to implement fingerprint-based duplicate detection. We used a tuple of `(AWB, charge_type, amount)` to reliably catch duplicates across different invoice numbers, and added AP register checks for identical invoices that were completely resent.
 > For Slice 5 (Waived but Billed), I guided the AI to implement strict authority resolution. It cross-checks the sender of a waiver email against the `schedule_1` facts to ensure the person has explicit authority for the 'waivers' category, guarding against unauthorized fee waivers (another hard gate).
+> For Slice 6 (Late Fees), I had the AI implement logic to resolve final due dates by calculating the base due date from the AP register and applying any authorized email extensions. The AI wrote detectors to flag unjust late fees as findings, and impending late fees as `late_fee_risk` in the portfolio.
 
 ## Written without AI
 

@@ -65,6 +65,9 @@ def report(as_of: str, mode: str, state_dir: str) -> dict:
     findings.extend(detectors.detect_duplicate(facts, as_of))
     findings.extend(detectors.detect_waived(facts, as_of))
     
+    late_findings, late_risks = detectors.detect_late_fees(facts, as_of)
+    findings.extend(late_findings)
+    
     # 3. Process actions
     for finding in findings:
         actions.set_finding_action(finding, mode)
@@ -76,7 +79,7 @@ def report(as_of: str, mode: str, state_dir: str) -> dict:
         "portfolio": {
             "cashback": [],
             "expiry": [],
-            "late_fee_risk": []
+            "late_fee_risk": late_risks
         }
     }
 

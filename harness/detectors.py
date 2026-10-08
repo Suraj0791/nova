@@ -189,3 +189,74 @@ def detect_waived(facts: list[dict], as_of: str) -> list[dict]:
                     })
                     
     return findings
+
+def detect_late_fees(facts: list[dict], as_of: str) -> tuple[list[dict], list[dict]]:
+    """Returns (findings, risk_portfolio)"""
+    from datetime import datetime
+    findings = []
+    risk_portfolio = []
+    
+    invoice_lines = [f for f in facts if f.get("type") == "invoice_line"]
+    ap_statuses = {f.get("invoice_id"): f for f in facts if f.get("type") == "ap_status"}
+    
+    # 1. Late fee not owed
+    for line in invoice_lines:
+        if line.get("charge_type") == "late_fee":
+            invoice_id = line.get("invoice_id")
+            final_due = resolve.get_due_date(invoice_id, facts)
+            ap_entry = ap_statuses.get(invoice_id)
+            
+            if final_due and ap_entry:
+                paid_date = ap_entry.get("paid_date")
+                amount = money(line.get("amount", 0))
+                
+                is_late = False
+                if paid_date and paid_date > final_due:
+                    is_late = True
+                elif not paid_date and as_of > final_due:
+                    is_late = True
+                    
+                if not is_late and amount > Decimal("0.00"):
+                    findings.append({
+                        "id": f"late_not_owed:{invoice_id}",
+                        "class": "late_fee_not_owed",
+                        "key": {"invoice_id": invoice_id, "class": "late_fee_not_owed"},
+                        "verdict": "finding",
+                        "amount_usd": str(amount),
+                        "action": "human_review",
+                        "confidence": 0.95,
+                        "evidence": [
+                            {"doc": line.get("doc_ref", ""), "page": 1, "quote": line.get("quote", "")},
+                            {"doc": ap_entry.get("doc_ref", ""), "page": 1, "quote": ap_entry.get("quote", "")}
+                        ]
+                    })
+
+    # 2. Late fee risk
+    as_of_dt = datetime.strptime(as_of, "%Y-%m-%d")
+    for invoice_id, ap_entry in ap_statuses.items():
+        if ap_entry.get("status") == "unpaid":
+            final_due = resolve.get_due_date(invoice_id, facts)
+            if final_due:
+                due_dt = datetime.strptime(final_due, "%Y-%m-%d")
+                if (due_dt - as_of_dt).days <= 3:
+                    # Calculate 5% risk if we want, or just set to 0.00 as per simple schema
+                    # Let's approximate total invoice amount for the risk
+                    lines = [l for l in invoice_lines if l.get("invoice_id") == invoice_id]
+                    total_inv = sum((money(l.get("amount", 0)) for l in lines), Decimal("0.00"))
+                    risk_amount = money(total_inv * Decimal("0.05"))
+                    
+                    # Ensure evidence includes the invoice/ap status and extension if any
+                    risk_portfolio.append({
+                        "id": f"risk:{invoice_id}",
+                        "class": "late_fee_risk",
+                        "key": {"invoice_id": invoice_id, "class": "late_fee_risk"},
+                        "verdict": "finding",
+                        "amount_usd": str(risk_amount),
+                        "action": "internal:payment_reminder",
+                        "confidence": 0.90,
+                        "evidence": [
+                            {"doc": ap_entry.get("doc_ref", ""), "page": 1, "quote": ap_entry.get("quote", "")}
+                        ]
+                    })
+                    
+    return findings, risk_portfolio
