@@ -97,7 +97,37 @@ def report(as_of: str, mode: str, state_dir: str) -> dict:
 
 
 def feedback(feedback_file: str, state_dir: str) -> None:
-    pass
+    import json
+    from pathlib import Path
+    from . import store, extract
+    
+    ff = Path(feedback_file)
+    if not ff.exists():
+        return
+        
+    try:
+        data = json.loads(ff.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        print(f"Failed to read {feedback_file}")
+        return
+        
+    if isinstance(data, dict):
+        data = [data]
+        
+    store.save_feedback(state_dir, data)
+    
+    new_facts = []
+    for item in data:
+        explanation = item.get("explanation", "")
+        if not explanation:
+            continue
+            
+        facts = extract.extract_feedback_facts(explanation, item)
+        new_facts.extend(facts)
+        
+    if new_facts:
+        store.save_facts(state_dir, new_facts)
+        print(f"Extracted and saved {len(new_facts)} new facts from feedback")
 
 
 def main(argv=None) -> int:

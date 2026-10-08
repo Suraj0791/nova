@@ -87,3 +87,40 @@ def extract_facts(doc_ref: str, text_pages: list[str], state_dir: str) -> dict:
     except Exception as e:
         print(f"Failed to extract facts for {doc_ref}: {e}")
         return {"doc_type": "unknown", "facts": []}
+
+def extract_feedback_facts(explanation: str, item: dict) -> list[dict]:
+    """Converts human feedback into facts while strictly enforcing the One-Off Waiver hard gate."""
+    client = Anthropic()
+    
+    system = """You are a highly accurate system converting human feedback into structured facts.
+Output ONLY a JSON array of facts.
+
+CRITICAL INSTRUCTION - THE ONE-OFF WAIVER TRAP:
+If the human says a waiver, exception, or override is for "this shipment", "just this once", "this invoice", or implies a single use, you MUST set the `exact_scope` to the specific ID provided in the feedback context (e.g. the invoice_id or awb). 
+Do NOT make it a standing or global waiver unless explicitly stated as "going forward", "always", or "standing".
+
+Fact Types:
+- "waiver": { "type": "waiver", "sender": "human_reviewer", "exact_scope": "specific AWB or 'standing'", "waived_charge_type": "...", "quote": "..." }
+- "extension": { "type": "extension", "sender": "human_reviewer", "invoice_id": "...", "new_due_date": "...", "quote": "..." }
+
+Return ONLY a valid JSON array like: [{"type": "waiver", ...}]
+"""
+    user_msg = f"Context: {json.dumps(item)}\n\nHuman Explanation: {explanation}"
+    
+    try:
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=1024,
+            system=system,
+            messages=[{"role": "user", "content": user_msg}],
+            temperature=0.0
+        )
+        content = response.content[0].text.strip()
+        if content.startswith("```json"):
+            content = content[7:]
+        if content.endswith("```"):
+            content = content[:-3]
+        return json.loads(content)
+    except Exception as e:
+        print(f"Failed to parse feedback: {e}")
+        return []

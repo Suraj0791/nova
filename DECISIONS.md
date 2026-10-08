@@ -41,3 +41,7 @@ This document tracks the reasoning behind our major design choices, particularly
 ## 10. Autonomous Safety Guard
 **Decision:** `actions.py` enforces the 4 strict conditions for autonomous actions: evidence complete (confidence > 0.8), no conflict, invoice total < $5,000, and action is reversible. It computes the *entire* invoice amount, not just the disputed amount.
 **Why:** This directly solves the Hard Gate "Autonomous mode sends only when all four conditions hold". By strictly checking the `invoice_total` and validating that `execute:dispute` is reversible (unlike paying), we stay under the risk cap.
+
+## 11. Feedback Loop & The One-Off Trap
+**Decision:** When reading `feedback.json`, the LLM uses a highly restrictive prompt to parse the human's explanation. It is explicitly instructed to bind `exact_scope` to the specific shipment if words like "just this once" or "this shipment" are used.
+**Why:** Directly defeats the Hard Gate "A waiver that says it was only for one shipment must not become permanent." Without this, the system might create a standing waiver and fail on subsequent batches.
