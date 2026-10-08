@@ -62,6 +62,7 @@ def report(as_of: str, mode: str, state_dir: str) -> dict:
     
     # 2. Run detectors
     findings = detectors.detect_overcharge(facts, as_of)
+    findings.extend(detectors.detect_duplicate(facts, as_of))
     
     # 3. Process actions
     for finding in findings:

@@ -29,3 +29,7 @@ This document tracks the reasoning behind our major design choices, particularly
 ## 7. Decimal-First Arithmetic
 **Decision:** We use Python's `decimal.Decimal` with `ROUND_HALF_UP` for all money calculations.
 **Why:** Floats introduce rounding errors (e.g., `0.05 * 65566.99 = 3278.34949...`). The grader requires exact $0.01 tolerance, and standard Python `round()` uses banker's rounding (half-to-even) instead of the required half-up. Wrapping everything in a custom `money()` function guarantees exact financial math.
+
+## 8. Duplicate Fingerprinting
+**Decision:** The duplicate detector builds a fingerprint `(AWB, charge_type, amount)` for every invoice line.
+**Why:** This allows us to detect cross-invoice duplicates effortlessly without deep-nested loops. We sort matching fingerprints by `invoice_date` to ensure only the later (duplicate) invoice gets flagged.

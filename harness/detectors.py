@@ -68,3 +68,86 @@ def detect_overcharge(facts: list[dict], as_of: str) -> list[dict]:
             findings.append(finding)
             
     return findings
+
+def detect_duplicate(facts: list[dict], as_of: str) -> list[dict]:
+    findings = []
+    
+    # 1. Type 2 Duplicate: Different invoice, same AWB + charge_type + amount
+    invoice_lines = [f for f in facts if f.get("type") == "invoice_line"]
+    seen_lines = {}
+    
+    for line in invoice_lines:
+        awb = line.get("awb")
+        charge_type = line.get("charge_type")
+        amount = money(line.get("amount", 0))
+        
+        if not awb or not charge_type or amount == Decimal("0.00"):
+            continue
+            
+        fingerprint = (awb, charge_type, str(amount))
+        if fingerprint not in seen_lines:
+            seen_lines[fingerprint] = []
+        seen_lines[fingerprint].append(line)
+        
+    for fingerprint, lines in seen_lines.items():
+        if len(lines) > 1:
+            # Sort by invoice_date to flag the later invoice
+            def get_inv_date(l):
+                inv_id = l.get("invoice_id")
+                meta = next((f for f in facts if f.get("type") == "invoice_meta" and f.get("invoice_id") == inv_id), None)
+                return meta.get("invoice_date", as_of) if meta else as_of
+                
+            sorted_lines = sorted(lines, key=get_inv_date)
+            original = sorted_lines[0]
+            
+            for dup_line in sorted_lines[1:]:
+                invoice_id = dup_line.get("invoice_id", "unknown")
+                findings.append({
+                    "id": f"duplicate:{invoice_id}:{fingerprint[0]}:{fingerprint[1]}",
+                    "class": "duplicate",
+                    "key": {"invoice_id": invoice_id, "class": "duplicate"},
+                    "verdict": "finding",
+                    "amount_usd": fingerprint[2],
+                    "action": "human_review",
+                    "confidence": 0.95,
+                    "evidence": [
+                        {"doc": original.get("doc_ref", ""), "page": 1, "quote": original.get("quote", "")},
+                        {"doc": dup_line.get("doc_ref", ""), "page": 1, "quote": dup_line.get("quote", "")}
+                    ]
+                })
+
+    # 2. Type 1 Duplicate: Same invoice resent, already paid in AP register
+    invoice_metas = [f for f in facts if f.get("type") == "invoice_meta"]
+    ap_status = {f.get("invoice_id"): f for f in facts if f.get("type") == "ap_status"}
+    
+    seen_invoices = {}
+    for meta in invoice_metas:
+        inv_id = meta.get("invoice_id")
+        if inv_id not in seen_invoices:
+            seen_invoices[inv_id] = []
+        seen_invoices[inv_id].append(meta)
+        
+    for inv_id, metas in seen_invoices.items():
+        if len(metas) > 1:
+            status = ap_status.get(inv_id)
+            if status and status.get("status") in ("paid", "scheduled"):
+                # Flag the full amount
+                lines_for_inv = [l for l in invoice_lines if l.get("invoice_id") == inv_id]
+                total_amount = sum((money(l.get("amount", 0)) for l in lines_for_inv), Decimal("0.00"))
+                
+                later_meta = metas[-1] # Simplistic, relies on ingest order
+                findings.append({
+                    "id": f"duplicate:{inv_id}:resent",
+                    "class": "duplicate",
+                    "key": {"invoice_id": inv_id, "class": "duplicate"},
+                    "verdict": "finding",
+                    "amount_usd": str(total_amount),
+                    "action": "human_review",
+                    "confidence": 0.90,
+                    "evidence": [
+                        {"doc": status.get("doc_ref", ""), "page": 1, "quote": status.get("quote", "")},
+                        {"doc": later_meta.get("doc_ref", ""), "page": 1, "quote": later_meta.get("quote", "")}
+                    ]
+                })
+                
+    return findings
