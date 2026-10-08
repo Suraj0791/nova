@@ -68,6 +68,8 @@ def report(as_of: str, mode: str, state_dir: str) -> dict:
     late_findings, late_risks = detectors.detect_late_fees(facts, as_of)
     findings.extend(late_findings)
     
+    cashback_risks, expiry_risks = detectors.calculate_cashback_and_expiry(facts, as_of)
+    
     # 3. Process actions
     for finding in findings:
         actions.set_finding_action(finding, mode)
@@ -77,8 +79,8 @@ def report(as_of: str, mode: str, state_dir: str) -> dict:
         "mode": mode,
         "findings": findings,
         "portfolio": {
-            "cashback": [],
-            "expiry": [],
+            "cashback": cashback_risks,
+            "expiry": expiry_risks,
             "late_fee_risk": late_risks
         }
     }

@@ -260,3 +260,65 @@ def detect_late_fees(facts: list[dict], as_of: str) -> tuple[list[dict], list[di
                     })
                     
     return findings, risk_portfolio
+
+def calculate_cashback_and_expiry(facts: list[dict], as_of: str) -> tuple[list[dict], list[dict]]:
+    """Returns (cashback_portfolio, expiry_portfolio)"""
+    from datetime import datetime
+    cashback_portfolio = []
+    expiry_portfolio = []
+    
+    # 1. Cashback calculations
+    invoice_lines = [f for f in facts if f.get("type") == "invoice_line" and f.get("charge_type") in ("air_freight", "freight")]
+    
+    spend_by_lane = {}
+    for line in invoice_lines:
+        lane = line.get("lane", "unknown")
+        amount = money(line.get("amount", 0))
+        spend_by_lane[lane] = spend_by_lane.get(lane, Decimal("0.00")) + amount
+        
+    cashback_tiers = [f for f in facts if f.get("type") == "cashback_tier"]
+    
+    for tier in cashback_tiers:
+        lane = tier.get("lane")
+        threshold = money(tier.get("spend_threshold", 0))
+        percent = Decimal(str(tier.get("cashback_percentage", 0)))
+        
+        current_spend = spend_by_lane.get(lane, Decimal("0.00"))
+        
+        if current_spend >= threshold and threshold > 0:
+            earned = money(current_spend * (percent / Decimal("100")))
+            if earned > Decimal("0.00"):
+                cashback_portfolio.append({
+                    "id": f"cashback:{lane}",
+                    "lane": lane,
+                    "earned_cashback": str(earned),
+                    "evidence": [{"doc": tier.get("doc_ref", ""), "page": 1, "quote": tier.get("quote", "")}]
+                })
+                
+    # 2. Expiry risk
+    credits = [f for f in facts if f.get("type") == "credit"]
+    as_of_dt = datetime.strptime(as_of, "%Y-%m-%d")
+    
+    for cred in credits:
+        expiry_date = cred.get("expiry_date")
+        if not expiry_date:
+            continue
+            
+        try:
+            exp_dt = datetime.strptime(expiry_date, "%Y-%m-%d")
+            days_left = (exp_dt - as_of_dt).days
+            
+            # If expiring within 30 days and not already expired
+            if 0 <= days_left <= 30:
+                amount = money(cred.get("amount", 0))
+                expiry_portfolio.append({
+                    "id": f"expiry:{cred.get('credit_id', 'unknown')}",
+                    "credit_id": cred.get("credit_id", "unknown"),
+                    "expiry_date": expiry_date,
+                    "amount_at_risk": str(amount),
+                    "evidence": [{"doc": cred.get("doc_ref", ""), "page": 1, "quote": cred.get("quote", "")}]
+                })
+        except ValueError:
+            pass # Ignore malformed dates
+            
+    return cashback_portfolio, expiry_portfolio

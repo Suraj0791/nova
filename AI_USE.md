@@ -14,6 +14,7 @@ Replace each prompt line (the ones starting with `>`) with your own words.
 > For Slice 4 (Duplicate Detector), I asked the AI to implement fingerprint-based duplicate detection. We used a tuple of `(AWB, charge_type, amount)` to reliably catch duplicates across different invoice numbers, and added AP register checks for identical invoices that were completely resent.
 > For Slice 5 (Waived but Billed), I guided the AI to implement strict authority resolution. It cross-checks the sender of a waiver email against the `schedule_1` facts to ensure the person has explicit authority for the 'waivers' category, guarding against unauthorized fee waivers (another hard gate).
 > For Slice 6 (Late Fees), I had the AI implement logic to resolve final due dates by calculating the base due date from the AP register and applying any authorized email extensions. The AI wrote detectors to flag unjust late fees as findings, and impending late fees as `late_fee_risk` in the portfolio.
+> For Slice 7 (Portfolio Analytics), I asked the AI to build the `cashback` and `expiry` calculators. We used the LLM to extract volume tier facts and credit notes, which the Python logic then processes against total lane spend and `as_of` dates to correctly populate the portfolio arrays.
 
 ## Written without AI
 
