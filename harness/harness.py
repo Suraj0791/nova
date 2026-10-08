@@ -23,12 +23,32 @@ DEFAULT_STATE = ".state"
 
 def ingest(batch_dir: str, state_dir: str) -> None:
     import os
+    import uuid
     from . import reader
+    from . import extract
+    from . import store
+    
     os.makedirs(state_dir, exist_ok=True)
     
     # Read all documents in the batch
     docs = reader.read_batch(batch_dir)
-    print(f"Ingested {len(docs)} documents from {batch_dir}")
+    print(f"Read {len(docs)} documents from {batch_dir}")
+    
+    all_facts = []
+    for doc_ref, (pages, is_scan) in docs.items():
+        if is_scan and not pages:
+            print(f"Skipping {doc_ref}: image-only scan without text layer")
+            continue
+            
+        extraction = extract.extract_facts(doc_ref, pages, state_dir)
+        
+        for fact in extraction.get("facts", []):
+            fact["doc_ref"] = doc_ref
+            fact["fact_id"] = str(uuid.uuid4())
+            all_facts.append(fact)
+            
+    store.save_facts(state_dir, all_facts)
+    print(f"Extracted and saved {len(all_facts)} facts")
 
 
 def report(as_of: str, mode: str, state_dir: str) -> dict:
