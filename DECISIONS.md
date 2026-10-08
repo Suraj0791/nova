@@ -37,3 +37,7 @@ This document tracks the reasoning behind our major design choices, particularly
 ## 9. Authority Resolution Strategy
 **Decision:** `resolve.py` centralizes the check for sender authority (`is_authorized`) against Schedule 1 facts.
 **Why:** Directly addresses a Hard Gate (unauthorized waivers/extensions). If a random employee or an AI instruction says "waive this fee", the system drops it instantly because that sender won't exist in Schedule 1 for the 'waivers' category.
+
+## 10. Autonomous Safety Guard
+**Decision:** `actions.py` enforces the 4 strict conditions for autonomous actions: evidence complete (confidence > 0.8), no conflict, invoice total < $5,000, and action is reversible. It computes the *entire* invoice amount, not just the disputed amount.
+**Why:** This directly solves the Hard Gate "Autonomous mode sends only when all four conditions hold". By strictly checking the `invoice_total` and validating that `execute:dispute` is reversible (unlike paying), we stay under the risk cap.

@@ -1,30 +1,12 @@
 from decimal import Decimal
 
-# Hard-gate constants
-MAX_SAFE_AUTONOMOUS_AMOUNT = Decimal("5000.00")
-HUMAN_REVIEW_THRESHOLD = Decimal("5000.00")
+MAX_AUTONOMOUS_INVOICE_TOTAL = Decimal("5000.00")
 
-def set_finding_action(finding: dict, mode: str) -> None:
-    """Sets the action field based on the mode and safety checks to avoid hard gates."""
-    
+def set_finding_action(finding: dict, mode: str, invoice_total: Decimal) -> None:
     verdict = finding.get("verdict")
     finding_class = finding.get("class")
     
-    if verdict == "conflict":
-        finding["action"] = "escalate"
-        return
-        
-    if verdict == "cannot_determine":
-        finding["action"] = "draft:request_document" if mode == "supervised" else "execute:request_document"
-        return
-        
-    if verdict == "no_finding":
-        finding["action"] = "none"
-        return
-
-    amount = Decimal(finding.get("amount_usd", "0.00"))
-    
-    # Internal actions (always execute, in both modes)
+    # Internal actions are always safe
     if finding_class in ("expiry", "late_fee_risk", "cashback"):
         if finding_class == "expiry":
             finding["action"] = "internal:alert"
@@ -34,24 +16,40 @@ def set_finding_action(finding: dict, mode: str) -> None:
             finding["action"] = "internal:track_credit"
         return
 
-    # Outbound Actions logic (e.g. overcharge, duplicate, waived, late_fee_not_owed)
-    
-    if amount >= HUMAN_REVIEW_THRESHOLD:
-        finding["action"] = "human_review"
+    # Base action logic for findings
+    if verdict == "conflict":
+        base_action = "escalate"
+    elif verdict == "cannot_determine":
+        base_action = "request_document"
+    elif verdict == "no_finding":
+        finding["action"] = "none"
         return
-
-    # HARD GATE DEFENSE: Supervised mode MUST NEVER execute outbound.
-    if mode == "supervised":
-        finding["action"] = "draft:dispute"
-        return
-        
-    # Autonomous mode checks (Safe unattended action test)
-    # We will expand this as we build more rules, but basic safe defaults:
-    is_reversible = True # Disputes are reversible
-    no_conflict = True # We already checked verdict != conflict
-    evidence_complete = True # Simple for now
-    
-    if is_reversible and no_conflict and evidence_complete and amount < MAX_SAFE_AUTONOMOUS_AMOUNT:
-        finding["action"] = "execute:dispute"
     else:
-        finding["action"] = "human_review"
+        base_action = "dispute"
+
+    # Now apply Gates
+    if mode == "supervised":
+        # Hard Gate: Supervised never sends outbound.
+        if base_action == "escalate":
+            finding["action"] = "escalate"
+        else:
+            finding["action"] = f"draft:{base_action}"
+    else: # autonomous
+        # Hard Gate: Autonomous only sends if ALL 4 conditions hold
+        # 1. evidence complete (confidence > 0.8)
+        evidence_complete = finding.get("confidence", 0.0) > 0.8 and len(finding.get("evidence", [])) > 0
+        # 2. no conflict
+        no_conflict = verdict != "conflict"
+        # 3. invoice under $5k
+        under_5k = invoice_total < MAX_AUTONOMOUS_INVOICE_TOTAL
+        # 4. action reversible
+        is_reversible = base_action in ("dispute", "request_document")
+        
+        if evidence_complete and no_conflict and under_5k and is_reversible:
+            finding["action"] = f"execute:{base_action}"
+        else:
+            # If any condition fails, fallback safely
+            if base_action == "escalate":
+                finding["action"] = "escalate"
+            else:
+                finding["action"] = "human_review"

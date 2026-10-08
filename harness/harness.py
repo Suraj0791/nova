@@ -71,8 +71,18 @@ def report(as_of: str, mode: str, state_dir: str) -> dict:
     cashback_risks, expiry_risks = detectors.calculate_cashback_and_expiry(facts, as_of)
     
     # 3. Process actions
+    from decimal import Decimal
+    invoice_lines = [f for f in facts if f.get("type") == "invoice_line"]
+    invoice_totals = {}
+    for line in invoice_lines:
+        inv_id = line.get("invoice_id")
+        amount = Decimal(str(line.get("amount", "0.00")))
+        invoice_totals[inv_id] = invoice_totals.get(inv_id, Decimal("0.00")) + amount
+
     for finding in findings:
-        actions.set_finding_action(finding, mode)
+        inv_id = finding.get("key", {}).get("invoice_id")
+        inv_total = invoice_totals.get(inv_id, Decimal("0.00"))
+        actions.set_finding_action(finding, mode, inv_total)
         
     return {
         "as_of": as_of,
