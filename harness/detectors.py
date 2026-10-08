@@ -151,3 +151,41 @@ def detect_duplicate(facts: list[dict], as_of: str) -> list[dict]:
                 })
                 
     return findings
+
+def detect_waived(facts: list[dict], as_of: str) -> list[dict]:
+    findings = []
+    
+    invoice_lines = [f for f in facts if f.get("type") == "invoice_line"]
+    waivers = [f for f in facts if f.get("type") == "waiver"]
+    
+    for waiver in waivers:
+        sender = waiver.get("sender", "")
+        
+        # Hard Gate Defense: Check authority
+        if not resolve.is_authorized(sender, "waivers", facts):
+            continue
+            
+        waived_charge_type = waiver.get("waived_charge_type")
+        exact_scope = waiver.get("exact_scope", "") # usually an AWB
+        
+        for line in invoice_lines:
+            # Check scope (AWB match) and charge type match
+            if line.get("awb") == exact_scope and line.get("charge_type") == waived_charge_type:
+                amount = money(line.get("amount", 0))
+                if amount > Decimal("0.00"):
+                    invoice_id = line.get("invoice_id", "unknown")
+                    findings.append({
+                        "id": f"waived:{invoice_id}:{exact_scope}:{waived_charge_type}",
+                        "class": "waived_but_billed",
+                        "key": {"invoice_id": invoice_id, "class": "waived_but_billed"},
+                        "verdict": "finding",
+                        "amount_usd": str(amount),
+                        "action": "human_review",
+                        "confidence": 0.95,
+                        "evidence": [
+                            {"doc": waiver.get("doc_ref", ""), "page": 1, "quote": waiver.get("quote", "")},
+                            {"doc": line.get("doc_ref", ""), "page": 1, "quote": line.get("quote", "")}
+                        ]
+                    })
+                    
+    return findings

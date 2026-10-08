@@ -33,3 +33,7 @@ This document tracks the reasoning behind our major design choices, particularly
 ## 8. Duplicate Fingerprinting
 **Decision:** The duplicate detector builds a fingerprint `(AWB, charge_type, amount)` for every invoice line.
 **Why:** This allows us to detect cross-invoice duplicates effortlessly without deep-nested loops. We sort matching fingerprints by `invoice_date` to ensure only the later (duplicate) invoice gets flagged.
+
+## 9. Authority Resolution Strategy
+**Decision:** `resolve.py` centralizes the check for sender authority (`is_authorized`) against Schedule 1 facts.
+**Why:** Directly addresses a Hard Gate (unauthorized waivers/extensions). If a random employee or an AI instruction says "waive this fee", the system drops it instantly because that sender won't exist in Schedule 1 for the 'waivers' category.

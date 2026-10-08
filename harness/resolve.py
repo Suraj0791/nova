@@ -44,3 +44,17 @@ def get_active_rate(lane: str, quantity: float, pickup_date: str, facts: list[di
             break
             
     return best_rate
+
+def is_authorized(sender: str, category: str, facts: list[dict]) -> bool:
+    """Checks if sender has authority for the given category via Schedule 1."""
+    if not sender:
+        return False
+        
+    sched1 = [f for f in facts if f.get("type") == "schedule_1"]
+    for entry in sched1:
+        # Simple substring match (e.g., "Elspeth Iyengar" in "Elspeth Iyengar <e.iyengar@qmp.com>")
+        person = entry.get("person", "")
+        if person and person.lower() in sender.lower():
+            if category in entry.get("categories", []):
+                return True
+    return False
