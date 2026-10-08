@@ -4,11 +4,11 @@ Replace each prompt line (the ones starting with `>`) with your own words.
 
 ## Tools
 
-> Which AI tools and models you used, and for which parts of the work.
+> I used an AI coding assistant (Gemini 3.1 Pro via Antigravity IDE) to help structure the project and write the boilerplate code. We used it to design the 8-file architecture, set up the initial harness skeleton, and write the document reading logic (reader.py).
 
 ## How you worked with them
 
-> What you asked them to do, what you checked yourself, and where they got it wrong.
+> I worked with the AI using a "vertical slicing" approach. I asked it to first lay out a complete end-to-end plan covering the 6 finding classes and the 5 hard gates. Then, I had it implement the foundation (reader and JSONL store) while I reviewed the logic to ensure it exactly matches the grader's string extraction method. I explicitly told the AI not to use LangChain or other heavy abstractions, forcing it to write simple, explainable Python.
 
 ## Written without AI
 

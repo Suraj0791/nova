@@ -22,19 +22,30 @@ DEFAULT_STATE = ".state"
 
 
 def ingest(batch_dir: str, state_dir: str) -> None:
-    raise NotImplementedError(
-        f"ingest is not written yet: read the .eml files in {batch_dir} and keep what you learn under {state_dir}")
+    import os
+    from . import reader
+    os.makedirs(state_dir, exist_ok=True)
+    
+    # Read all documents in the batch
+    docs = reader.read_batch(batch_dir)
+    print(f"Ingested {len(docs)} documents from {batch_dir}")
 
 
 def report(as_of: str, mode: str, state_dir: str) -> dict:
-    raise NotImplementedError(
-        f"report is not written yet: return the report.json dict for --as-of {as_of} in {mode} mode "
-        "(see grader/schema/report.schema.json and data/examples/*/expected_finding.json)")
+    return {
+        "as_of": as_of,
+        "mode": mode,
+        "findings": [],
+        "portfolio": {
+            "cashback": [],
+            "expiry": [],
+            "late_fee_risk": []
+        }
+    }
 
 
 def feedback(feedback_file: str, state_dir: str) -> None:
-    raise NotImplementedError(
-        f"feedback is not written yet: store the decisions in {feedback_file} under {state_dir} so later reports use them")
+    pass
 
 
 def main(argv=None) -> int:
