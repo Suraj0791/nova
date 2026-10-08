@@ -52,10 +52,25 @@ def ingest(batch_dir: str, state_dir: str) -> None:
 
 
 def report(as_of: str, mode: str, state_dir: str) -> dict:
+    import json
+    from . import store
+    from . import detectors
+    from . import actions
+    
+    # 1. Load all facts
+    facts = store.load_facts(state_dir)
+    
+    # 2. Run detectors
+    findings = detectors.detect_overcharge(facts, as_of)
+    
+    # 3. Process actions
+    for finding in findings:
+        actions.set_finding_action(finding, mode)
+        
     return {
         "as_of": as_of,
         "mode": mode,
-        "findings": [],
+        "findings": findings,
         "portfolio": {
             "cashback": [],
             "expiry": [],

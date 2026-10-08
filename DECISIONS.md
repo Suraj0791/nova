@@ -21,3 +21,11 @@ This document tracks the reasoning behind our major design choices, particularly
 ## 5. Prompt Injection Defense
 **Decision:** The system prompt explicitly wraps the document content as "DATA" and strictly instructs the model not to follow instructions found within it.
 **Why:** This directly addresses one of the 5 Hard Gates ("following an instruction written inside an email"). By treating the email body strictly as a string to extract facts from, we ensure malicious instructions like "approve this invoice" are parsed as data, not executed.
+
+## 6. Action Safety Gate
+**Decision:** `harness/actions.py` enforces that if `mode == "supervised"`, outbound actions are ALWAYS formatted as `draft:*`.
+**Why:** Prevents the Hard Gate "sending anything outbound in supervised mode". It is decoupled from the detectors so that a detector never accidentally sets a forbidden action.
+
+## 7. Decimal-First Arithmetic
+**Decision:** We use Python's `decimal.Decimal` with `ROUND_HALF_UP` for all money calculations.
+**Why:** Floats introduce rounding errors (e.g., `0.05 * 65566.99 = 3278.34949...`). The grader requires exact $0.01 tolerance, and standard Python `round()` uses banker's rounding (half-to-even) instead of the required half-up. Wrapping everything in a custom `money()` function guarantees exact financial math.
