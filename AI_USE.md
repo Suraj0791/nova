@@ -17,6 +17,7 @@ Replace each prompt line (the ones starting with `>`) with your own words.
 > For Slice 7 (Portfolio Analytics), I asked the AI to build the `cashback` and `expiry` calculators. We used the LLM to extract volume tier facts and credit notes, which the Python logic then processes against total lane spend and `as_of` dates to correctly populate the portfolio arrays.
 > For Slice 8 (Autonomous Rules), I guided the AI to refactor the action assignment logic to strictly comply with the 4 Hard Gate conditions for autonomous mode (reversible, <$5000 invoice total, no conflict, complete evidence). I made sure the invoice total calculation was passed from `harness.py` into the rules engine.
 > For Slice 9 (Feedback Loop), I used the AI to build the `feedback` command processor. To defend against the "One-off Waiver Trap" (another hard gate), I had the AI write a highly specific prompt instructing Claude to scope temporary waivers strictly to the `AWB` or `invoice_id`, ensuring they don't become global standing waivers.
+> For Slice 10 (Review & Design), I had the AI rewrite `DESIGN.md` to clearly explain our architectural philosophy, handling of hard gates, and reasoning behind the JSONL and deterministic Python approach.
 
 ## Written without AI
 
